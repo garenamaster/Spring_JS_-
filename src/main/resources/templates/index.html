@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Календарь расписания</title>
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        #calendar {
+            margin-bottom: 30px;
+        }
+        #event-details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .event-item {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #28a745;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .no-events {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 20px;
+        }
+        .loading {
+            text-align: center;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📅 Календарь расписания</h1>
+
+    <div id="calendar"></div>
+
+    <div id="event-details">
+        <h3>Детали расписания</h3>
+        <div id="event-list">
+            <p class="no-events">Нажмите на дату в календаре, чтобы посмотреть расписание</p>
+        </div>
+    </div>
+</div>
+
+<script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const calendarEl = document.getElementById('calendar');
+            const eventList = document.getElementById('event-list');
+
+            // Инициализация календаря
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'ru',
+                firstDay: 1, // Понедельник первый день недели
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,dayGridWeek'
+                },
+                buttonText: {
+                    today: 'Сегодня',
+                    month: 'Месяц',
+                    week: 'Неделя'
+                },
+
+                // Обработчик клика по дате
+                dateClick: function(info) {
+                    loadEventsForDate(info.dateStr);
+                },
+
+                // Загрузка всех событий для отображения в календаре
+                events: {
+                    url: 'api/events/all',
+                    method: 'GET',
+                    failure: function() {
+                        console.error('Ошибка загрузки событий для календаря');
+                    }
+                },
+
+                // Настройка отображения событий в календаре
+                eventDisplay: 'block',
+                eventColor: '#3788d8'
+            });
+
+            calendar.render();
+
+            // Функция загрузки событий для конкретной даты
+            function loadEventsForDate(dateString) {
+                // Показываем загрузку
+                eventList.innerHTML = '<p class="loading">Загрузка...</p>';
+
+                fetch(`api/events/date?date=${dateString}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Ошибка сети');
+                        }
+                        return response.json();
+                    })
+                    .then(events => {
+                        displayEvents(events, dateString);
+                    })
+                    .catch(error => {
+                        console.error('Ошибка:', error);
+                        eventList.innerHTML = `<p style="color: red;">Ошибка загрузки данных: ${error.message}</p>`;
+                    });
+            }
+
+            // Функция отображения событий
+            function displayEvents(events, date) {
+                const options = {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'long'
+                };
+                const formattedDate = new Date(date).toLocaleDateString('ru-RU', options);
+
+                if (events.length === 0) {
+                    eventList.innerHTML = `
+                        <h4>${formattedDate}</h4>
+                        <p class="no-events">На эту дату расписания нет</p>
+                    `;
+                } else {
+                    let html = `<h4>${formattedDate}</h4>`;
+
+                    events.forEach(event => {
+                        html += `
+                            <div class="event-item">
+                                <strong>${event.title || 'Без названия'}</strong>
+                                ${event.description ? `<p>${event.description}</p>` : ''}
+                            </div>
+                        `;
+                    });
+
+                    eventList.innerHTML = html;
+                }
+            }
+
+            // Загружаем события для сегодняшней даты при загрузке страницы
+            const today = new Date().toISOString().split('T')[0];
+            loadEventsForDate(today);
+        });
+    </script>
+</body>
+</html>
